@@ -36,12 +36,25 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
+header arp_t {
+    bit<16> hwType16;
+    bit<16> protoType;
+    bit<8> hwAddrLen;
+    bit<8> protoAddrLen;
+    bit<16> opcode;
+    bit<48> hwSrcAddr;
+    bit<32> protoSrcAddr;
+    bit<48> hwDstAddr;
+    bit<32> protoDstAddr;
+}
+
 struct metadata {
 }
 
 struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
+    arp_t        arp;
 }
 
 /*************************************************************************
@@ -105,7 +118,6 @@ control MyIngress(inout headers hdr,
         }
         actions = {
             ipv4_forward;
-            drop;
             NoAction;
         }
         size = 1024;
