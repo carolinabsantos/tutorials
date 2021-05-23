@@ -11,7 +11,6 @@ sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)),
                  '../../utils/'))
 import p4runtime_lib.bmv2
-from p4runtime_lib.error_utils import printGrpcError
 from p4runtime_lib.switch import ShutdownAllSwitchConnections
 import p4runtime_lib.helper
 
@@ -20,7 +19,7 @@ SWITCH_TO_SWITCH_PORT = 2
 
 
 def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
-                     dst_eth_addr, dst_ip_addr):
+                     dst_eth_addr, dst_ip_addr, port):
     """
     Installs three rules:
     1) An tunnel ingress rule on the ingress switch in the ipv4_lpm table that
@@ -69,7 +68,17 @@ def writeTunnelRules(p4info_helper, ingress_sw, egress_sw, tunnel_id,
 
     # TODO build the transit rule
     # TODO install the transit rule on the ingress switch
-    print "TODO Install transit tunnel rule"
+    table_entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.myTunnel_exact",
+        match_fields={
+            "hdr.myTunnel.dst_id": tunnel_id
+        },
+        action_name="MyIngress.myTunnel_forward",
+        action_params={
+            "port": port
+        })
+    ingress_sw.WriteTableEntry(table_entry)
+    print "Installed transit tunnel rule on %s" % ingress_sw.name
 
     # 3) Tunnel Egress Rule
     # For our simple topology, the host will always be located on the
@@ -103,9 +112,18 @@ def readTableRules(p4info_helper, sw):
             entry = entity.table_entry
             # TODO For extra credit, you can use the p4info_helper to translate
             #      the IDs in the entry to names
-            print entry
-            print '-----'
-
+            table_name = p4info_helper.get_tables_name(entry.table_id)
+            print '%s: ' % table_name,
+            for m in entry.match:
+                print p4info_helper.get_match_field_name(table_name, m.field_id),
+                print '%r' % (p4info_helper.get_match_field_value(m),),
+            action = entry.action.action
+            action_name = p4info_helper.get_actions_name(action.action_id)
+            print '->', action_name,
+            for p in action.params:
+                print p4info_helper.get_action_param_name(action_name, p.param_id),
+                print '%r' % p.value,
+            print
 
 def printCounter(p4info_helper, sw, counter_name, index):
     """
@@ -126,6 +144,13 @@ def printCounter(p4info_helper, sw, counter_name, index):
                 counter.data.packet_count, counter.data.byte_count
             )
 
+def printGrpcError(e):
+    print "gRPC Error:", e.details(),
+    status_code = e.code()
+    print "(%s)" % status_code.name,
+    traceback = sys.exc_info()[2]
+    print "[%s:%d]" % (traceback.tb_frame.f_code.co_filename, traceback.tb_lineno)
+
 def main(p4info_file_path, bmv2_file_path):
     # Instantiate a P4Runtime helper from the p4info file
     p4info_helper = p4runtime_lib.helper.P4InfoHelper(p4info_file_path)
@@ -144,11 +169,17 @@ def main(p4info_file_path, bmv2_file_path):
             address='127.0.0.1:50052',
             device_id=1,
             proto_dump_file='logs/s2-p4runtime-requests.txt')
+        s3 = p4runtime_lib.bmv2.Bmv2SwitchConnection(
+            name='s3',
+            address='127.0.0.1:50053',
+            device_id=2,
+            proto_dump_file='logs/s3-p4runtime-requests.txt')
 
         # Send master arbitration update message to establish this controller as
         # master (required by P4Runtime before performing any other write operation)
         s1.MasterArbitrationUpdate()
         s2.MasterArbitrationUpdate()
+        s3.MasterArbitrationUpdate()
 
         # Install the P4 program on the switches
         s1.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
@@ -157,18 +188,38 @@ def main(p4info_file_path, bmv2_file_path):
         s2.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
                                        bmv2_json_file_path=bmv2_file_path)
         print "Installed P4 Program using SetForwardingPipelineConfig on s2"
+        s3.SetForwardingPipelineConfig(p4info=p4info_helper.p4info,
+                                       bmv2_json_file_path=bmv2_file_path)
+        print "Installed P4 Program using SetForwardingPipelineConfig on s3"
 
         # Write the rules that tunnel traffic from h1 to h2
         writeTunnelRules(p4info_helper, ingress_sw=s1, egress_sw=s2, tunnel_id=100,
-                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
+                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2", port=2)
 
         # Write the rules that tunnel traffic from h2 to h1
         writeTunnelRules(p4info_helper, ingress_sw=s2, egress_sw=s1, tunnel_id=200,
-                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
+                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1", port=2)
+
+        # Write the rules that tunnel traffic from h1 to h3
+        writeTunnelRules(p4info_helper, ingress_sw=s1, egress_sw=s3, tunnel_id=300,
+                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3", port=3)
+
+        # Write the rules that tunnel traffic from h2 to h3
+        writeTunnelRules(p4info_helper, ingress_sw=s2, egress_sw=s3, tunnel_id=400,
+                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3", port=3)
+
+        # Write the rules that tunnel traffic from h3 to h1
+        writeTunnelRules(p4info_helper, ingress_sw=s3, egress_sw=s1, tunnel_id=500,
+                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1", port=2)
+
+        # Write the rules that tunnel traffic from h3 to h2
+        writeTunnelRules(p4info_helper, ingress_sw=s3, egress_sw=s2, tunnel_id=600,
+                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2", port=3)
 
         # TODO Uncomment the following two lines to read table entries from s1 and s2
-        # readTableRules(p4info_helper, s1)
-        # readTableRules(p4info_helper, s2)
+        readTableRules(p4info_helper, s1)
+        readTableRules(p4info_helper, s2)
+        readTableRules(p4info_helper, s3)
 
         # Print the tunnel counters every 2 seconds
         while True:
@@ -178,6 +229,8 @@ def main(p4info_file_path, bmv2_file_path):
             printCounter(p4info_helper, s2, "MyIngress.egressTunnelCounter", 100)
             printCounter(p4info_helper, s2, "MyIngress.ingressTunnelCounter", 200)
             printCounter(p4info_helper, s1, "MyIngress.egressTunnelCounter", 200)
+            printCounter(p4info_helper, s1, "MyIngress.ingressTunnelCounter", 300)
+            printCounter(p4info_helper, s3, "MyIngress.egressTunnelCounter", 300)
 
     except KeyboardInterrupt:
         print " Shutting down."
