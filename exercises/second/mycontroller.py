@@ -118,37 +118,50 @@ def main(p4info_file_path, bmv2_file_path):
         print "Installed P4 Program using SetForwardingPipelineConfig on s3"
 
         # Write the rules that tunnel traffic from h1 to h2
-        writeForwardingRules(p4info_helper, ingress_sw=s1, port=2,
-                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=1,
+                         dst_eth_addr="08:00:00:00:02:02", dst_ip_addr="10.0.2.20")
 
         # Write the rules that tunnel traffic from h1 to h3
-        writeForwardingRules(p4info_helper, ingress_sw=s1, port=3,
-                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=2,
+                         dst_eth_addr="08:00:00:00:03:03", dst_ip_addr="10.0.3.30")
+
+        # Write the rules that tunnel traffic from h1 to h4
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=2,
+                         dst_eth_addr="08:00:00:00:03:44", dst_ip_addr="10.0.3.40")
 
         # Write the rules that tunnel traffic from h2 to h1
-        writeForwardingRules(p4info_helper, ingress_sw=s2, port=2,
-                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=1,
+                         dst_eth_addr="08:00:00:00:01:01", dst_ip_addr="10.0.1.10")
 
         # Write the rules that tunnel traffic from h2 to h3
-        writeForwardingRules(p4info_helper, ingress_sw=s2, port=3,
-                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=2,
+                         dst_eth_addr="08:00:00:00:03:03", dst_ip_addr="10.0.3.30")
 
-        # Write the rules that tunnel traffic from h3  to h1
-        writeForwardingRules(p4info_helper, ingress_sw=s3, port=2,
-                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
+        # Write the rules that tunnel traffic from h2 to h4
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=2,
+                         dst_eth_addr="08:00:00:00:03:44", dst_ip_addr="10.0.3.40")
 
-        # Write the rules that tunnel traffic from h3  to h2
-        writeForwardingRules(p4info_helper, ingress_sw=s3, port=3,
-                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
-
-        writeForwardingRules(p4info_helper, ingress_sw=s1, port=1,
-                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
-
-        writeForwardingRules(p4info_helper, ingress_sw=s2, port=1,
-                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
-
+        # Write the rules that tunnel traffic from h3 and h4  to h1
         writeForwardingRules(p4info_helper, ingress_sw=s3, port=1,
-                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
+                         dst_eth_addr="08:00:00:00:01:01", dst_ip_addr="10.0.1.10")
+
+        # Write the rules that tunnel traffic from h3 and h4  to h2
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=2,
+                         dst_eth_addr="08:00:00:00:02:02", dst_ip_addr="10.0.2.20")
+
+        # Write the rules that tunnel traffic from s3 to h3
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=3,
+                         dst_eth_addr="08:00:00:00:03:03", dst_ip_addr="10.0.3.30")
+        # Write the rules that tunnel traffic from s3 to h4
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=4,
+                         dst_eth_addr="08:00:00:00:03:44", dst_ip_addr="10.0.3.40")
+        # Write the rules that tunnel traffic from s1 to h1
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=3,
+                         dst_eth_addr="08:00:00:00:01:01", dst_ip_addr="10.0.1.10")
+        # Write the rules that tunnel traffic from s2 to h2
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=3,
+                         dst_eth_addr="08:00:00:00:02:02", dst_ip_addr="10.0.2.20")
+
 
         readTableRules(p4info_helper, s1)
         readTableRules(p4info_helper, s2)
@@ -165,10 +178,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='P4Runtime Controller')
     parser.add_argument('--p4info', help='p4info proto in text format from p4c',
                         type=str, action="store", required=False,
-                        default='./build/ecn.p4.p4info.txt')
+                        default='./build/forwarding.p4.p4info.txt')
     parser.add_argument('--bmv2-json', help='BMv2 JSON file from p4c',
                         type=str, action="store", required=False,
-                        default='./build/ecn.json')
+                        default='./build/forwarding.json')
     args = parser.parse_args()
 
     if not os.path.exists(args.p4info):
