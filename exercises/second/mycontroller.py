@@ -15,7 +15,7 @@ from p4runtime_lib.switch import ShutdownAllSwitchConnections
 import p4runtime_lib.helper
 
 
-def writeForwardingRules(p4info_helper, ingress_sw, egress_sw, port,
+def writeForwardingRules(p4info_helper, ingress_sw, port,
                      dst_eth_addr, dst_ip_addr):
     """
     Installs a forwarding rule
@@ -37,7 +37,7 @@ def writeForwardingRules(p4info_helper, ingress_sw, egress_sw, port,
         action_name="MyIngress.ipv4_forward",
         action_params={
             "dstAddr"   : dst_eth_addr,
-            "port"      : port,
+            "port"      : port
         })
     ingress_sw.WriteTableEntry(table_entry)
     print "Installed forwarding rule on %s" % ingress_sw.name
@@ -118,36 +118,42 @@ def main(p4info_file_path, bmv2_file_path):
         print "Installed P4 Program using SetForwardingPipelineConfig on s3"
 
         # Write the rules that tunnel traffic from h1 to h2
-        writeForwardingRules(p4info_helper, ingress_sw=s1, egress_sw=s2, port=2,
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=2,
                          dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
 
         # Write the rules that tunnel traffic from h1 to h3
-        writeForwardingRules(p4info_helper, ingress_sw=s1, egress_sw=s3, port=3,
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=3,
                          dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
 
         # Write the rules that tunnel traffic from h2 to h1
-        writeForwardingRules(p4info_helper, ingress_sw=s2, egress_sw=s1, port=2,
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=2,
                          dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
 
         # Write the rules that tunnel traffic from h2 to h3
-        writeForwardingRules(p4info_helper, ingress_sw=s2, egress_sw=s3, port=3,
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=3,
                          dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
 
         # Write the rules that tunnel traffic from h3  to h1
-        writeForwardingRules(p4info_helper, ingress_sw=s3, egress_sw=s1, port=2,
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=2,
                          dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
 
         # Write the rules that tunnel traffic from h3  to h2
-        writeForwardingRules(p4info_helper, ingress_sw=s3, egress_sw=s1, port=3,
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=3,
                          dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
+
+        writeForwardingRules(p4info_helper, ingress_sw=s1, port=1,
+                         dst_eth_addr="08:00:00:00:01:11", dst_ip_addr="10.0.1.1")
+
+        writeForwardingRules(p4info_helper, ingress_sw=s2, port=1,
+                         dst_eth_addr="08:00:00:00:02:22", dst_ip_addr="10.0.2.2")
+
+        writeForwardingRules(p4info_helper, ingress_sw=s3, port=1,
+                         dst_eth_addr="08:00:00:00:03:33", dst_ip_addr="10.0.3.3")
 
         readTableRules(p4info_helper, s1)
         readTableRules(p4info_helper, s2)
         readTableRules(p4info_helper, s3)
-        
-        while True:
-            sleep(2)
-            print '\n----- Reading tunnel counters -----'
+
     except KeyboardInterrupt:
         print " Shutting down."
     except grpc.RpcError as e:

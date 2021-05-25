@@ -138,16 +138,7 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
-    action mark_ecn() {
-        hdr.ipv4.ecn = 3;
-    }
-    apply {
-        if (hdr.ipv4.ecn == 1 || hdr.ipv4.ecn == 2){
-            if (standard_metadata.enq_qdepth >= ECN_THRESHOLD){
-                mark_ecn();
-            }
-        }
-    }
+    apply {  }
 }
 
 /*************************************************************************
@@ -183,6 +174,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.arp);
     }
 }
 
